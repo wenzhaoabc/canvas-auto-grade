@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "build": "tsc",
+    "start": "npm run build && node dist/main.js"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.8",
+    "dotenv": "^16.4.7",
+    "playwright": "^1.50.1",
+    "typescript": "^5.8.2"
+  },
+  "dependencies": {
+    "openai": "^4.86.2"
+  }
+}

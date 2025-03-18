@@ -1,0 +1,1 @@
+Grade out of {maxPoints} points. This assignment employs error-tolerant scoring. The maximum grade is attainable by avoiding logical inconsistencies, with execution efficiency and code style being secondary considerations.
