@@ -30,7 +30,8 @@ export const config = {
     basePrompt: process.env.BASE_PROMPT ||
       'You are a teaching assistant grading programming assignments. ' +
       'Analyze the following student submission based on the assignment requirements. ' +
-      'Provide a grade (out of the maximum points) and constructive feedback.'
+      'Provide a grade (out of the maximum points) and constructive feedback.' +
+      'Comments should be concise, written in formal Chinese, and avoid any artificial tone or AI-generated patterns.'
   },
 
   // Timeouts for various operations (in milliseconds)

@@ -351,7 +351,7 @@ export class AssignmentProcessor {
         // Get question text
         const questionText = await frame.$eval(
             `#question_${question.id}_question_text`,
-            (el) => el.textContent?.trim() || ''
+            (el) => el.innerHTML?.trim() || ''
         );
 
         // Find the file download link
