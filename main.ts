@@ -1,57 +1,97 @@
 import 'dotenv/config';
-import { chromium, Browser } from 'playwright';
-import { loginToCanvas } from './src/auth';
-import { processAssignment } from './src/assignment-processor';
+import * as path from 'path';
 import { config } from './src/config';
 import { logger } from './src/utils/logger';
+import { getSubmissionFiles, loadQuestions, parseFileName } from './src/services/file-parser';
+import { ContentExtractionService } from './src/services/content-extractor';
+import { GradingService } from './src/services/grader';
+import { ResultStorage } from './src/services/result-storage';
 
-
-let browser: Browser | null = null;
-
-/**
- * Main function that runs the Canvas auto-review process
- */
 async function main() {
-  logger.info('Starting Canvas auto-review process');
+    try {
+        logger.info('Starting Auto Grading process');
 
-  try {
-    // Initialize browser with configured options
-    browser = await chromium.launch({
-      headless: config.headless,
-      slowMo: config.slowMo,
-    });
+        // Initialize services
+        const contentExtractor = new ContentExtractionService();
+        const gradingService = new GradingService();
+        const resultStorage = new ResultStorage('./results', config.assignmentId);
+        await resultStorage.loadResults(); // Load existing results if any
 
-    // Create page with configured viewport
-    const page = await browser.newPage({
-      viewport: { width: config.viewport.width, height: config.viewport.height }
-    });
+        // Load questions
+        const questionsDir = path.join(process.cwd(), 'questions');
+        const questions = loadQuestions(questionsDir);
+        logger.info(`Loaded ${questions.size} question rubrics`);
 
-    // Login to Canvas
-    await loginToCanvas(page);
+        // Get submission files
+        const downloadsDir = path.resolve(process.env.DOWNLOAD_PATH || './downloads');
+        const submissions = await getSubmissionFiles(downloadsDir);
+        logger.info(`Found ${submissions.length} submission files`);
 
-    // Process the specified assignment for all students
-    await processAssignment(
-      page,
-      config.courseId,
-      config.assignmentId
-    );
+        // Process each submission
+        let processedCount = 0;
+        let errorCount = 0;
 
-    logger.info('Auto-review process completed successfully');
-  } catch (error) {
-    logger.error('Error in auto-review process:', error);
-  } finally {
-    // Ensure browser is closed even if an error occurs
-    if (browser) {
-      await browser.close();
-      browser = null;
-      logger.info('Browser closed');
+        for (const submission of submissions) {
+            try {
+                // Skip if we don't have a rubric for this question
+                if (!questions.has(submission.questionId)) {
+                    logger.warn(`No rubric found for question ${submission.questionId}, skipping`);
+                    continue;
+                }
+
+                // Skip if already graded
+                if (resultStorage.resultExists(submission.studentId, submission.questionId)) {
+                    logger.info(`Submission for student ${submission.studentId}, question ${submission.questionId} already graded, skipping`);
+                    continue;
+                }
+
+                // Extract content from file
+                const content = await contentExtractor.extractContent(submission.filePath);
+
+                // Grade the submission
+                const question = questions.get(submission.questionId)!;
+                const result = await gradingService.gradeSubmission(submission, content, question);
+
+                // Store the result
+                resultStorage.addResult(result);
+                processedCount++;
+
+                // Save intermediate results periodically
+                if (processedCount % 10 === 0) {
+                    await resultStorage.saveResults();
+                    logger.info(`Processed ${processedCount} submissions so far`);
+                }
+            } catch (error) {
+                logger.error(`Error processing submission ${submission.filePath}: ${error}`);
+                errorCount++;
+            }
+
+            // if (processedCount >= 6) {
+            //     break; // TODO : Remove this line to process all submissions
+            // }
+        }
+
+        // Save final results
+        const outputPath = await resultStorage.saveResults();
+        logger.info(`Grading complete. Processed ${processedCount} submissions with ${errorCount} errors.`);
+        logger.info(`Results saved to ${outputPath}`);
+
+    } catch (error) {
+        logger.error(`Fatal error: ${error}`);
+        process.exit(1);
     }
-  }
 }
-
-// Execute the main function
-main().catch(error => {
-  logger.error('Unhandled error in main function:', error);
-  process.exit(1);
-});
+// Run the application
+main()
+    .then(() => {
+        logger.info('Auto Grading process completed successfully');
+    })
+    .catch(error => {
+        logger.error(`Uncaught error: ${error}`);
+        process.exit(1);
+    })
+    .finally(() => {
+        logger.info('Exiting application');
+        process.exit(0);
+    });
 

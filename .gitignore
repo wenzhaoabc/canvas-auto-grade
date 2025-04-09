@@ -45,3 +45,7 @@ playwright/.cache/
 # Windows
 Thumbs.db
 ehthumbs.db
+
+# workspace files
+results/
+questions/

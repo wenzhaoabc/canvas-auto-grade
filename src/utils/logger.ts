@@ -10,7 +10,7 @@ if (!fs.existsSync(logDir)) {
 
 // Create log file path with timestamp
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-const logPath = path.join(logDir, `autoreview-${timestamp}.log`);
+const logPath = path.join(logDir, `autograde-${timestamp}.log`);
 
 // Create write stream for logging to file
 const logStream = fs.createWriteStream(logPath, { flags: 'a', encoding: 'utf8' });
@@ -22,7 +22,7 @@ type LogLevel = 'info' | 'warn' | 'error' | 'debug';
  * Formats a log message with timestamp and level
  */
 function formatLogMessage(level: LogLevel, message: string, ...args: any[]): string {
-  const timestamp = new Date().toISOString();
+  const timestamp = new Date().toLocaleString();
   const formattedMessage = args.length > 0 ? util.format(message, ...args) : message;
   return `[${timestamp}] [${level.toUpperCase()}] ${formattedMessage}`;
 }
@@ -46,7 +46,7 @@ function log(level: LogLevel, message: string, ...args: any[]): void {
       break;
     case 'debug':
       // Only log debug messages when in debug mode
-      if (process.env.DEBUG === 'true') {
+      if (process.env.APP_DEBUG === 'true') {
         console.debug(formattedMessage);
       }
       break;
