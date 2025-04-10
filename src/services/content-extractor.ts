@@ -100,7 +100,7 @@ export class ContentExtractionService {
 
             for (const extractor of this.extractors) {
                 if (extractor.canHandle(filePath)) {
-                    logger.debug(`Using extractor ${extractor.constructor.name} for ${filePath}`);
+                    logger.debug(`Using extractor ${extractor.constructor.name} for ${path.basename(filePath)}`);
                     return await extractor.extractContent(filePath);
                 }
             }

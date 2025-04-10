@@ -30,6 +30,7 @@ async function main() {
         // Process each submission
         let processedCount = 0;
         let errorCount = 0;
+        const totalSubmissions = submissions.length;
 
         for (const submission of submissions) {
             try {
@@ -59,7 +60,9 @@ async function main() {
                 // Save intermediate results periodically
                 if (processedCount % 10 === 0) {
                     await resultStorage.saveResults();
-                    logger.info(`Processed ${processedCount} submissions so far`);
+                    // Log dynamic progress, progress bar, etc.
+                    const progress = Math.round((processedCount / totalSubmissions) * 100);
+                    logger.info(`Progress: ${progress}% (${processedCount}/${totalSubmissions})`);
                 }
             } catch (error) {
                 logger.error(`Error processing submission ${submission.filePath}: ${error}`);

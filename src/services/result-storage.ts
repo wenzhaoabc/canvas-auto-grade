@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { GradingResult } from '../types';
 import { logger } from '../utils/logger';
-import { formatDateTime } from '../utils/tools';
 
 export class ResultStorage {
   private outputPath: string;
@@ -14,7 +13,7 @@ export class ResultStorage {
       fs.mkdirSync(outputDirectory, { recursive: true });
     }
 
-    this.outputPath = path.join(outputDirectory, `assignment_${assignmentId}_grade.json`);
+    this.outputPath = path.join(outputDirectory, `grade-book-${assignmentId}.json`);
   }
 
   /**
