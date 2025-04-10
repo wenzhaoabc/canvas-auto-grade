@@ -1,7 +1,7 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import { Page, Frame } from 'playwright';
-import { Student, SubmissionStatus, QuestionToReview, GradingResultWithStu } from './types';
+import { Student, SubmissionStatus, QuestionToReview, GradingResultWithStu, StudentSubmissionStatus } from './types';
 import { gradeSubmission } from './llm-api';
 import { extractFileContent, isPreviewableFile } from './file-handler';
 import { loadRubric } from './utils/rubric-loader';
@@ -17,6 +17,7 @@ export class AssignmentProcessor {
     private assignmentId: string;
     private rubric: string = '';
     private evaluatedGrades: GradingResultWithStu[] = [];
+    private studentSubmissionStatus: Map<string, StudentSubmissionStatus> = new Map<string, StudentSubmissionStatus>();
 
     /**
      * Creates a new AssignmentProcessor instance
@@ -28,6 +29,36 @@ export class AssignmentProcessor {
         this.page = page;
         this.courseId = courseId;
         this.assignmentId = assignmentId;
+
+        this.setupResponseListeners();
+    }
+
+    private setupResponseListeners(): void {
+        this.page.on('response', async (response) => {
+            if (response.url().includes(`/speed_grader.json?assignment_id=${this.assignmentId}`)) {
+                let responseBody;
+                const contentType = response.headers()['content-type'] || '';
+
+                if (contentType.includes('application/json')) {
+                    responseBody = await response.json().catch(() => null);
+                } else {
+                    return;
+                }
+
+                if (responseBody) {
+                    responseBody.submissions.forEach((submission: any) => {
+                        const hasSubmission = submission.missing === false;
+                        const studentId: string = submission.user_id;
+                        const hasGraded = submission.workflow_state === 'graded';
+                        this.studentSubmissionStatus.set(studentId, {
+                            studentId,
+                            hasSubmission,
+                            hasGraded
+                        });
+                    })
+                }
+            }
+        });
     }
 
     /**
@@ -75,7 +106,19 @@ export class AssignmentProcessor {
                     // Navigate to the student's submission
                     await this.navigateToStudentSubmission(student.id);
 
-                    // await this.page.pause(); for debugging
+                    // Check if the student has a submission and if it has been graded
+                    const studentSubmissionStatus = this.studentSubmissionStatus.get(student.id);
+                    if (studentSubmissionStatus) {
+                        if (!studentSubmissionStatus.hasSubmission) {
+                            logger.info(`Student ${student.name} has no submission`);
+                            await this.submitFeedback('作业未提交');
+                            continue;
+                        }
+                        if (studentSubmissionStatus.hasGraded) {
+                            logger.info(`Student ${student.name} has already been graded`);
+                            continue;
+                        }
+                    }
 
                     // Check submission status
                     const submissionStatus = await this.checkSubmissionStatus();
@@ -546,7 +589,7 @@ export class AssignmentProcessor {
         logger.info(`Canvas calculated overall grade: ${calculatedGrade}`);
 
         // Submit the feedback
-        await this.submitFeedback('Good Job!');
+        await this.submitFeedback('已批阅');
     }
 
     /**

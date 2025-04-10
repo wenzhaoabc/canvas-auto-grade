@@ -6,6 +6,12 @@ export interface Student {
   name: string;
 }
 
+export interface StudentSubmissionStatus {
+  studentId: string;
+  hasSubmission: boolean;
+  hasGraded: boolean;
+}
+
 /**
  * Question that needs review
  */
