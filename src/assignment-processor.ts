@@ -1,6 +1,7 @@
-import { Page, Frame } from 'playwright';
 import * as path from 'path';
-import { Student, SubmissionStatus, QuestionToReview } from './types';
+import * as fs from 'fs';
+import { Page, Frame } from 'playwright';
+import { Student, SubmissionStatus, QuestionToReview, GradingResultWithStu } from './types';
 import { gradeSubmission } from './llm-api';
 import { extractFileContent, isPreviewableFile } from './file-handler';
 import { loadRubric } from './utils/rubric-loader';
@@ -15,6 +16,7 @@ export class AssignmentProcessor {
     private courseId: string;
     private assignmentId: string;
     private rubric: string = '';
+    private evaluatedGrades: GradingResultWithStu[] = [];
 
     /**
      * Creates a new AssignmentProcessor instance
@@ -33,6 +35,15 @@ export class AssignmentProcessor {
      */
     public async processAssignment(): Promise<void> {
         logger.info(`Processing assignment ${this.assignmentId} for course ${this.courseId}`);
+
+        try {
+            const content = await fs.promises.readFile(`results/grade-book-${this.assignmentId}.json`, 'utf-8')
+            this.evaluatedGrades = JSON.parse(content)
+            logger.info(`Loaded processed grading results for assignment ${this.assignmentId}`);
+        } catch (error) {
+            logger.warn(`Load previous grading results error: ${this.assignmentId}.`);
+            this.evaluatedGrades = []
+        }
 
         try {
             // Load rubric for this assignment
@@ -72,7 +83,7 @@ export class AssignmentProcessor {
                     if (!submissionStatus.hasSubmission) {
                         // If no submission, give default grade (0)
                         logger.info(`Student ${student.name} has no submission. Assigning default grade ${config.defaultGrade}`);
-                        await this.submitFeedback('No submission provided');
+                        await this.submitFeedback('作业未提交');
                     }
 
                     // If submission needs review, process it
@@ -85,6 +96,8 @@ export class AssignmentProcessor {
                     logger.error(`Error processing student ${student.name}:`, error);
                     // Continue with next student even if there's an error
                 }
+
+                //break; // TODO For debugging, remove this line to process all students
 
             }
         } catch (error) {
@@ -307,7 +320,12 @@ export class AssignmentProcessor {
                 // Process the appropriate question type
                 const isFileUpload = await this.isFileUploadQuestion(frame, question.id);
                 if (isFileUpload) {
-                    await this.processFileUploadQuestion(frame, question, student);
+                    if (this.evaluatedGrades.some(result => result.questionId === question.id
+                        && result.studentId === student.id)) {
+                        await this.gradeByPreviousGradingResults(question, student, frame);
+                    } else {
+                        await this.processFileUploadQuestion(frame, question, student);
+                    }
                 } else {
                     await this.processRegularQuestion(frame, question);
                 }
@@ -336,6 +354,22 @@ export class AssignmentProcessor {
         const hasFileUploadHolder = await frame.$(`#question_${questionId} .file-upload-question-holder`);
 
         return hasFileUploadClass || !!hasFileUploadHolder;
+    }
+
+    private async gradeByPreviousGradingResults(
+        question: QuestionToReview,
+        student: Student,
+        frame: Frame
+    ): Promise<void> {
+        const gradingResult = this.evaluatedGrades.find(result => result.questionId === question.id
+            && result.studentId === student.id);
+        if (!gradingResult) {
+            logger.warn(`No previous grading result found for question ${question.id} and student ${student.id}`);
+            return;
+        }
+        logger.info(`Using previous grading result for question ${question.id} for student ${student.id}`);
+        await this.setQuestionGrade(frame, question.id, gradingResult.grade);
+        await this.setQuestionComment(frame, question.id, gradingResult.grade === question.maxPoints ? "已批阅" : gradingResult.comment);
     }
 
     /**
@@ -367,15 +401,15 @@ export class AssignmentProcessor {
         if (!downloadUrl) {
             throw new Error('Invalid download URL');
         }
-        
+
         let fileContent = '';
         let skipGrading = false;
-        
+
         try {
             // Store current frame state/URL
             const currentUrl = frame.url();
             logger.debug(`Current frame URL before extraction: ${currentUrl}`);
-            
+
             // Check if file is likely previewable
             if (!isPreviewableFile(fileName)) {
                 logger.warn(`File ${fileName} is not a previewable type, skipping content extraction`);
@@ -384,18 +418,18 @@ export class AssignmentProcessor {
             } else {
                 // Extract file content from the preview
                 const extractionResult = await extractFileContent(
-                    this.page, 
-                    downloadUrl, 
-                    fileName, 
+                    this.page,
+                    downloadUrl,
+                    fileName,
                     student.id
                 );
                 fileContent = extractionResult.content;
-                
+
                 // Verify we're back on the correct page/question
                 if (frame.url() !== currentUrl) {
                     logger.warn('Frame URL changed after extraction, attempting to navigate back');
                     await frame.goto(currentUrl);
-                    
+
                     // Make sure we're focused on the right question again
                     await frame.evaluate((id) => {
                         const element = document.querySelector(`#question_${id}`);
@@ -413,8 +447,8 @@ export class AssignmentProcessor {
         if (skipGrading) {
             // If we couldn't extract content, leave a note and don't grade
             await this.setQuestionComment(
-                frame, 
-                question.id, 
+                frame,
+                question.id,
                 "This submission requires manual grading because the file type cannot be automatically reviewed."
             );
             logger.info(`Skipping automatic grading for question ${question.questionNumber}`);

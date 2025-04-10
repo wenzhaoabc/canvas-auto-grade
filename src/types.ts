@@ -45,6 +45,14 @@ export interface GradingResult {
   explanation?: string;
 }
 
+export interface GradingResultWithStu {
+  studentId: string;
+  questionId: string;
+  grade: number;
+  comment: string;
+  gradedAt: string;
+}
+
 /**
  * Results of processed submission
  */

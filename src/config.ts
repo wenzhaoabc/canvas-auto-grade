@@ -48,5 +48,5 @@ export const config = {
   defaultGrade: parseInt(process.env.DEFAULT_GRADE || '0'),
 
   // Debug mode
-  debug: process.env.DEBUG === 'true'
+  debug: process.env.APP_DEBUG === 'true'
 };

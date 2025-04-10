@@ -45,3 +45,7 @@ playwright/.cache/
 # Windows
 Thumbs.db
 ehthumbs.db
+
+# Business
+questions/
+results/
