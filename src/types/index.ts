@@ -1,4 +1,3 @@
-
 // This file contains type definitions for the grading system
 /**
  * Represents the type of assignment
