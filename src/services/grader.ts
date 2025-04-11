@@ -26,9 +26,11 @@ export class GradingService {
 
       const maxPoint = question.maxPoint || 100;
       const rubric = question.rubric.replace('{maxPoint}', maxPoint.toString());
+      const questionDescription = question.description || 'No description provided';
 
       // Construct the prompt for LLM
-      const prompt = this.constructPrompt(content, rubric, maxPoint);
+      const prompt = this.constructPrompt(content, questionDescription, rubric, maxPoint);
+      // logger.info("Prompt for LLM: ", prompt);
 
       // Call the LLM API
       const response = await this.openai.chat.completions.create({
@@ -69,14 +71,19 @@ export class GradingService {
   /**
    * Construct the prompt to send to the LLM
    */
-  private constructPrompt(content: string, rubric: string, maxPoint: number): string {
+  private constructPrompt(content: string, questionDescription: string, rubric: string, maxPoint: number): string {
     return `
-Assignment Submission:
+**Question Description**:
+\`\`\`
+${questionDescription}
+\`\`\`
+
+**Student Submission**:
 \`\`\`
 ${content}
 \`\`\`
 
-Grading Rubric:
+**Grading Rubric**:
 ${rubric}
 
 Please grade this submission based on the rubric above. The grade should be out of ${maxPoint} points.
@@ -112,7 +119,22 @@ Provide your response in JSON format with the following structure:
       };
     } catch (error) {
       logger.error(`Error parsing LLM response: ${error}`);
-      logger.debug(`Raw response: ${response}`);
+      logger.info("Try to parse the response by regex");
+      // Fallback to regex parsing if JSON parsing fails
+      const regex = /"grade":\s*([\d.]+),\s*"comment":\s*"(.*?)"/;
+      const match = response.match(regex);
+      if (match) {
+        const grade = parseFloat(match[1]);
+        const comment = match[2];
+
+        return {
+          studentId,
+          questionId,
+          grade: isNaN(grade) ? 0 : grade,
+          comment,
+          gradedAt: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
+        };
+      }
       return {
         studentId,
         questionId,

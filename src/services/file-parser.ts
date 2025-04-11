@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { SubmissionInfo, Question } from '../types';
+import { SubmissionInfo, Question, AssignmentType } from '../types';
 import { logger } from '../utils/logger';
 import { config } from '../config';
 
@@ -8,11 +8,18 @@ import { config } from '../config';
  * Parse the submission file name to extract student information and question ID
  * Format: <studentNumber:7位><studentId:6位>_question_<questionId:6位>_<submissionId:7位>_<fileName>
  */
-export function parseFileName(filePath: string): SubmissionInfo | null {
+export function parseFileName(filePath: string, assignmentType: AssignmentType): SubmissionInfo | null {
     try {
         const fileName = path.basename(filePath);
         // Match file name pattern
-        const regex = /^(\d{7})(\d{6})_question_(\d{6})_(\d{7})_(.+)$/;
+        let regex: RegExp;
+        if (assignmentType === AssignmentType.GROUP) {
+            regex = /^(\d{7})(\d{6})_question_(\d{6})_(\d{7})_(.+)$/;
+        } else if (assignmentType === AssignmentType.SINGLE) {
+            regex = /^(\d{7})_(\d{6})_(\d{7})_(.+)$/;
+        } else {
+            throw new Error(`Unsupported assignment type: ${assignmentType}`);
+        }
         const match = fileName.match(regex);
 
         if (!match) {
@@ -20,16 +27,34 @@ export function parseFileName(filePath: string): SubmissionInfo | null {
             return null;
         }
 
-        const [, studentNumber, studentId, questionId, submissionId, originalFileName] = match;
+        if (assignmentType === AssignmentType.GROUP) {
 
-        return {
-            studentNumber,
-            studentId,
-            questionId,
-            submissionId,
-            fileName: originalFileName,
-            filePath
-        };
+            const [, studentNumber, studentId, questionId, submissionId, originalFileName] = match;
+
+            return {
+                studentNumber,
+                studentId,
+                questionId,
+                submissionId,
+                fileName: originalFileName,
+                filePath
+            };
+        }
+        else if (assignmentType === AssignmentType.SINGLE) {
+
+            const [, studentNumber, studentId, submissionId, originalFileName] = match;
+
+            return {
+                studentNumber,
+                studentId,
+                questionId: config.assignmentId, // Use assignmentId as questionId for single submission
+                submissionId,
+                fileName: originalFileName,
+                filePath
+            };
+        } else {
+            throw new Error(`Unsupported assignment type: ${assignmentType}`);
+        }
     } catch (error) {
         logger.error(`Error parsing file name ${filePath}: ${error}`);
         return null;
@@ -39,7 +64,7 @@ export function parseFileName(filePath: string): SubmissionInfo | null {
 /**
  * Get all submission files from the download directory
  */
-export async function getSubmissionFiles(directory: string): Promise<SubmissionInfo[]> {
+export async function getSubmissionFiles(directory: string, assignmentType: AssignmentType): Promise<SubmissionInfo[]> {
     try {
         if (!fs.existsSync(directory)) {
             logger.error(`Directory does not exist: ${directory}`);
@@ -54,7 +79,7 @@ export async function getSubmissionFiles(directory: string): Promise<SubmissionI
             const stats = fs.statSync(filePath);
 
             if (stats.isFile()) {
-                const info = parseFileName(filePath);
+                const info = parseFileName(filePath, assignmentType);
                 if (info) {
                     submissions.push(info);
                 }

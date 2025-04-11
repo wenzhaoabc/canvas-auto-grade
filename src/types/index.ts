@@ -1,3 +1,14 @@
+
+// This file contains type definitions for the grading system
+/**
+ * Represents the type of assignment
+ */
+export enum AssignmentType {
+  SINGLE = 'single',
+  GROUP = 'group'
+}
+
+
 /**
  * Represents information parsed from a submission file name
  */
@@ -15,7 +26,7 @@ export interface SubmissionInfo {
  */
 export interface Question {
   questionId: string;
-  description?: string;
+  description: string;
   maxPoint?: number;
   rubric: string;
 }
