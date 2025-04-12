@@ -6,16 +6,38 @@ import { getSubmissionFiles, loadQuestions } from './src/services/file-parser';
 import { ContentExtractionService } from './src/services/content-extractor';
 import { GradingService } from './src/services/grader';
 import { ResultStorage } from './src/services/result-storage';
-import { AssignmentType } from './src/types';
+import { AssignmentType, Question, SubmissionInfo, GradingResult } from './src/types';
+
+// Initialize services
+const extractor = new ContentExtractionService();
+const grader = new GradingService();
+const resultStorage = new ResultStorage('./results', config.assignmentId);
+
+
+async function processSubmission(
+  submission: SubmissionInfo,
+  question: Question
+): Promise<GradingResult | { error: boolean }> {
+  try {
+    // Extract content from file
+    const content = await extractor.extractContent(submission.filePath);
+
+    // Grade the submission
+    const result = await grader.gradeSubmission(submission, content, question);
+
+    return result;
+  } catch (error) {
+    logger.error(`Error processing submission for question ${question.questionId} for student ${submission.studentId} : ${error}`);
+    return { error: true };
+  }
+}
+
+
 
 async function main() {
   try {
     logger.info('Starting Auto Grading process');
 
-    // Initialize services
-    const contentExtractor = new ContentExtractionService();
-    const gradingService = new GradingService();
-    const resultStorage = new ResultStorage('./results', config.assignmentId);
     await resultStorage.loadResults(); // Load existing results if any
     const assignmentType = config.assignmentType as AssignmentType; // 'single' or 'group'
     logger.info(`Assignment type: ${assignmentType}`);
@@ -35,46 +57,41 @@ async function main() {
     let errorCount = 0;
     const totalSubmissions = submissions.length;
 
-    for (const submission of submissions) {
-      try {
-        // Skip if we don't have a rubric for this question
-        if (!questions.has(submission.questionId)) {
-          logger.warn(`No rubric found for question ${submission.questionId}, skipping`);
-          continue;
-        }
+    // Filter out submissions that are needed to be graded
+    const filteredSubmissions = submissions.filter(submission => {
+      return questions.has(submission.questionId)
+        && !resultStorage.resultExists(submission.studentId, submission.questionId);
+    });
+    logger.info(`Filtered ${filteredSubmissions.length} submissions for grading`);
 
-        // Skip if already graded
-        if (resultStorage.resultExists(submission.studentId, submission.questionId)) {
-          logger.info(`Submission for student ${submission.studentId}, question ${submission.questionId} already graded, skipping`);
-          continue;
-        }
+    const batchSize = 10; // Number of submissions to process in each batch
+    const batches: SubmissionInfo[][] = [];
+    for (let i = 0; i < filteredSubmissions.length; i += batchSize) {
+      batches.push(filteredSubmissions.slice(i, i + batchSize));
+    }
 
-        // Extract content from file
-        const content = await contentExtractor.extractContent(submission.filePath);
-
-        // Grade the submission
+    for (const batch of batches) {
+      const results = await Promise.all(batch.map(submission => {
         const question = questions.get(submission.questionId)!;
-        const result = await gradingService.gradeSubmission(submission, content, question);
+        return processSubmission(submission, question);
+      }));
 
-        // Store the result
-        resultStorage.addResult(result);
-        processedCount++;
-
-        // Save intermediate results periodically
-        if (processedCount % 10 === 0) {
-          await resultStorage.saveResults();
-          // Log dynamic progress, progress bar, etc.
-          const progress = Math.round((processedCount / totalSubmissions) * 100);
-          logger.info(`Progress: ${progress}% (${processedCount}/${totalSubmissions})`);
+      for (const result of results) {
+        if (result && !('error' in result)) {
+          resultStorage.addResult(result);
+          processedCount++;
+        } else {
+          errorCount++;
         }
-      } catch (error) {
-        logger.error(`Error processing submission ${submission.filePath}: ${error}`);
-        errorCount++;
       }
 
-      // if (processedCount >= 6) {
-      // break; // TODO : Remove this line to process all submissions
-      // }
+      // Save intermediate results periodically
+      await resultStorage.saveResults();
+      // Log dynamic progress, progress bar, etc.
+      const progress = Math.round((processedCount / totalSubmissions) * 100);
+      logger.info(`Progress: ${progress}% (${processedCount}/${totalSubmissions})`);
+
+      // break; // Remove this line to process all batches in parallel
     }
 
     // Save final results

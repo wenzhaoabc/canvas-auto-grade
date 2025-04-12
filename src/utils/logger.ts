@@ -24,7 +24,9 @@ type LogLevel = 'info' | 'warn' | 'error' | 'debug';
 function formatLogMessage(level: LogLevel, message: string, ...args: any[]): string {
   const timestamp = new Date().toLocaleString();
   const formattedMessage = args.length > 0 ? util.format(message, ...args) : message;
-  return `[${timestamp}] [${level.toUpperCase()}] ${formattedMessage}`;
+  const levelLength = Math.max(level.length, 5); // 5 is the length of 'DEBUG'
+  const paddedLevel = level.toUpperCase().padEnd(levelLength, ' ');
+  return `[${timestamp}] [${paddedLevel}] ${formattedMessage}`;
 }
 
 /**

@@ -1,4 +1,4 @@
-import OpenAI from 'openai';
+import { OpenAI } from 'openai';
 import { Question, GradingResult, SubmissionInfo } from '../types';
 import { config } from '../config';
 import { logger } from '../utils/logger';
@@ -40,8 +40,9 @@ export class GradingService {
           { role: 'user', content: prompt }
         ],
         max_tokens: config.llm.maxTokens,
-        temperature: config.llm.temperature,
-        response_format: { type: 'json_object' }
+        // temperature: config.llm.temperature,
+        response_format: { type: 'json_object' },
+        stream: false,
       });
 
       if (!response.choices[0]?.message?.content) {
@@ -53,6 +54,15 @@ export class GradingService {
       const gradingResult = this.parseResponse(responseContent, submission.studentId, submission.questionId);
 
       logger.info(`Graded submission for student ${submission.studentId}, score: ${gradingResult.grade}/${maxPoint}`);
+      if (gradingResult.grade < maxPoint) {
+        if (config.llm.model.includes('deepseek-r1')) {
+          // TypeScript definition doesn't include reasoning_content but it exists in the DeepSeek API response
+          const message = response.choices[0].message as any;
+          const reasoningContent = message.reasoning_content || message.content;
+          logger.debug(`Reasoning from DeepSeek for student ${submission.studentId}, question ${submission.questionId}: ${reasoningContent}...`);
+        }
+        logger.debug(`LLM response for student ${submission.studentId}, question ${submission.questionId}: \n${responseContent}`);
+      }
       return gradingResult;
 
     } catch (error) {
@@ -79,7 +89,7 @@ ${questionDescription}
 \`\`\`
 
 **Student Submission**:
-\`\`\`
+\`\`\`python
 ${content}
 \`\`\`
 
@@ -118,7 +128,7 @@ Provide your response in JSON format with the following structure:
         gradedAt: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       };
     } catch (error) {
-      logger.error(`Error parsing LLM response: ${error}`);
+      logger.warn(`Error parsing LLM response: ${error}`);
       logger.info("Try to parse the response by regex");
       // Fallback to regex parsing if JSON parsing fails
       const regex = /"grade":\s*([\d.]+),\s*"comment":\s*"(.*?)"/;
