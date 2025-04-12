@@ -19,3 +19,10 @@
 
 - [playwright](https://playwright.dev/)
 - [copilot](https://copilot.github.com/)
+
+
+## Updates
+
+当前版本支持批改group/single类型作业，支持统一批阅作业后从文件读取评分，再填写至canvas系统，使用前需构造评分JSON文件，包含评分和评语。
+
+评语部分设置为满分时只设置'已评阅'，不设置额外评语。有扣分项时，填写JSON文件`comment`字段内容。single类型作业目前还不支持直接读取作业总分，需在`src/assignment-processor.ts#L138`中手动设置。

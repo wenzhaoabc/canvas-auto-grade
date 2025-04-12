@@ -5,6 +5,7 @@ export const config = {
   // Course and assignment identifiers
   courseId: process.env.COURSE_ID || '97701',
   assignmentId: process.env.ASSIGNMENT_ID || '82751',
+  assignmentType: process.env.ASSIGNMENT_TYPE || 'single', // single or group
 
   // Browser settings
   headless: process.env.HEADLESS === 'true',

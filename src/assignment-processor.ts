@@ -120,6 +120,28 @@ export class AssignmentProcessor {
                         }
                     }
 
+                    if (config.assignmentType === 'single') {
+                        // single type assignment
+                        const gradeResult = this.evaluatedGrades.find(result => result.studentId === student.id
+                            && result.questionId === this.assignmentId);
+
+                        if (!gradeResult) {
+                            logger.warn(`No previous grading result found for student ${student.name}`);
+                            continue;
+                        }
+                        logger.info(`Using previous grading result for student ${student.name}`);
+                        if (!gradeResult?.grade) {
+                            logger.warn(`No grade found for student ${student.name}, skipping`);
+                            continue;
+                        }
+                        await this.page.fill('#grading-box-extended', gradeResult.grade.toString());
+                        await this.submitFeedback(gradeResult.grade === 10 ? "已评阅" : gradeResult.comment);
+
+                        logger.info(`Feedback submitted for student ${student.name}`);
+                        continue;
+                        // break;
+                    }
+
                     // Check submission status
                     const submissionStatus = await this.checkSubmissionStatus();
 
@@ -140,7 +162,7 @@ export class AssignmentProcessor {
                     // Continue with next student even if there's an error
                 }
 
-                //break; // TODO For debugging, remove this line to process all students
+                // break; // TODO For debugging, remove this line to process all students
 
             }
         } catch (error) {
