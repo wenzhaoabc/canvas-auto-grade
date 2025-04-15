@@ -1,7 +1,8 @@
 {
   "scripts": {
     "build": "tsc",
-    "start": "npm run build && node dist/main.js"
+    "start": "npm run build && node dist/main.js",
+    "stadium": "npm run build && node dist/stadium.js"
   },
   "devDependencies": {
     "@types/node": "^22.13.8",
