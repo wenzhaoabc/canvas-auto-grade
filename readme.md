@@ -29,3 +29,10 @@ src
 test
     test.ts # 测试文件，测试各个模块的功能，是否正常工作
     test.sh # 测试脚本，测试各个模块的功能，是否正常工作
+
+
+## batch inference
+
+folder: `results/batch_<assignmentID>`
+file_name: `input_file.jsonl`,`input_file_id.txt`, `batch_id.txt`, `output_file.jsonl`, `error_file.jsonl`
+

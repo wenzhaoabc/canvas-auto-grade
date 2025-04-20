@@ -13,26 +13,60 @@ const extractor = new ContentExtractionService();
 const grader = new GradingService();
 const resultStorage = new ResultStorage('./results', config.assignmentId);
 
-
-async function processSubmission(
-  submission: SubmissionInfo,
-  question: Question
-): Promise<GradingResult | { error: boolean }> {
-  try {
-    // Extract content from file
-    const content = await extractor.extractContent(submission.filePath);
-
-    // Grade the submission
-    const result = await grader.gradeSubmission(submission, content, question);
-
-    return result;
-  } catch (error) {
-    logger.error(`Error processing submission for question ${question.questionId} for student ${submission.studentId} : ${error}`);
-    return { error: true };
+async function batchApi(
+  submissions: SubmissionInfo[],
+  questions: Map<string, Question>,
+  waitForCompletion: boolean = true,
+  processed: boolean = false
+): Promise<GradingResult[]> {
+  if (waitForCompletion) { processed = false; }
+  if (processed) {
+    logger.info("Get batch result from cloud service.");
+    grader.clearBatchItems(); // Clear batch items if already processed
+    return grader.getBatchResult();
   }
+
+  for (const submission of submissions) {
+    const question = questions.get(submission.questionId);
+    if (!question) {
+      logger.error(`Question ${submission.questionId} not found for submission ${submission.studentId}`);
+      continue;
+    }
+    const content = await extractor.extractContent(submission.filePath);
+    grader.addBatchItem(submission, content, question);
+  }
+  const result = await grader.batchGradingResult(waitForCompletion);
+
+  return result;
 }
 
+async function realApi(
+  submissions: SubmissionInfo[],
+  questions: Map<string, Question>
+): Promise<GradingResult[]> {
+  const results: GradingResult[] = [];
+  // utilize promise.all to process submissions in parallel
+  const promises = submissions.map(async (submission) => {
+    const question = questions.get(submission.questionId);
+    if (!question) {
+      logger.error(`Question ${submission.questionId} not found for submission ${submission.studentId}`);
+      return null; // Skip this submission
+    }
+    const content = await extractor.extractContent(submission.filePath);
+    return grader.gradeSubmission(submission, content, question);
+  });
 
+  const gradingResults = await Promise.all(promises);
+  for (const result of gradingResults) {
+    if (result && !('error' in result)) {
+      results.push(result);
+    } else {
+      logger.error(`Error processing submission: ${result?.error}`);
+    }
+  }
+
+  return results;
+}
 
 async function main() {
   try {
@@ -64,17 +98,17 @@ async function main() {
     });
     logger.info(`Filtered ${filteredSubmissions.length} submissions for grading`);
 
-    const batchSize = 10; // Number of submissions to process in each batch
+    const batchSize = 100; // Number of submissions to process in each batch
     const batches: SubmissionInfo[][] = [];
     for (let i = 0; i < filteredSubmissions.length; i += batchSize) {
       batches.push(filteredSubmissions.slice(i, i + batchSize));
     }
 
     for (const batch of batches) {
-      const results = await Promise.all(batch.map(submission => {
-        const question = questions.get(submission.questionId)!;
-        return processSubmission(submission, question);
-      }));
+      logger.info(`Processing batch of ${batch.length} submissions`);
+
+      const results = await batchApi(batch, questions, false, false);
+      // const results = await realApi(batch, questions);
 
       for (const result of results) {
         if (result && !('error' in result)) {
@@ -91,7 +125,7 @@ async function main() {
       const progress = Math.round((processedCount / totalSubmissions) * 100);
       logger.info(`Progress: ${progress}% (${processedCount}/${totalSubmissions})`);
 
-      // break; // Remove this line to process all batches in parallel
+      break; // Remove this line to process all batches in parallel
     }
 
     // Save final results

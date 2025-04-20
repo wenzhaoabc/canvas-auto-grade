@@ -1,16 +1,17 @@
+import * as fs from 'fs';
 import { OpenAI } from 'openai';
 import { Question, GradingResult, SubmissionInfo } from '../types';
 import { config } from '../config';
 import { logger } from '../utils/logger';
+import { formatDateTime } from '../utils/tools';
+import { LLMService } from './llm';
 
 export class GradingService {
-  private openai: OpenAI;
+  private llm: LLMService;
+  private batch_items: Record<string, any>[] = []
 
   constructor() {
-    this.openai = new OpenAI({
-      apiKey: config.llm.apiKey,
-      baseURL: config.llm.baseUrl,
-    });
+    this.llm = new LLMService();
   }
 
   /**
@@ -30,39 +31,14 @@ export class GradingService {
 
       // Construct the prompt for LLM
       const prompt = this.constructPrompt(content, questionDescription, rubric, maxPoint);
-      // logger.info("Prompt for LLM: ", prompt);
-
-      // Call the LLM API
-      const response = await this.openai.chat.completions.create({
-        model: config.llm.model,
-        messages: [
-          { role: 'system', content: config.llm.basePrompt },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: config.llm.maxTokens,
-        // temperature: config.llm.temperature,
-        response_format: { type: 'json_object' },
-        stream: false,
-      });
-
-      if (!response.choices[0]?.message?.content) {
+      const response = await this.llm.getResponse(prompt);
+      if (!response) {
         throw new Error('Empty response from LLM');
       }
 
       // Parse the LLM response
-      const responseContent = response.choices[0].message.content;
-      const gradingResult = this.parseResponse(responseContent, submission.studentId, submission.questionId);
-
+      const gradingResult = this.parseResponse(response, submission.studentId, submission.questionId);
       logger.info(`Graded submission for student ${submission.studentId}, score: ${gradingResult.grade}/${maxPoint}`);
-      if (gradingResult.grade < maxPoint) {
-        if (config.llm.model.includes('deepseek-r1')) {
-          // TypeScript definition doesn't include reasoning_content but it exists in the DeepSeek API response
-          const message = response.choices[0].message as any;
-          const reasoningContent = message.reasoning_content || message.content;
-          logger.debug(`Reasoning from DeepSeek for student ${submission.studentId}, question ${submission.questionId}: ${reasoningContent}...`);
-        }
-        logger.debug(`LLM response for student ${submission.studentId}, question ${submission.questionId}: \n${responseContent}`);
-      }
       return gradingResult;
 
     } catch (error) {
@@ -153,5 +129,110 @@ Provide your response in JSON format with the following structure:
         gradedAt: new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })
       };
     }
+  }
+
+  /**
+   * Parse the batch response file and extract grading results
+   * 
+   * @param filePath - The path to the file containing batch results
+   * @returns GradingResult[] - An array of grading results parsed from the file
+   */
+  private async parseBatchResponse(filePath: string): Promise<GradingResult[]> {
+    const batchRes = await fs.promises.readFile(filePath, 'utf-8');
+    const lines = batchRes.split('\n').filter(line => line.trim() !== '');
+    const results: GradingResult[] = [];
+    for (const line of lines) {
+      if (line.length <= 2 || line[0] !== '{') {
+        continue; // Skip non-JSON lines
+      }
+      try {
+        const data = JSON.parse(line);
+        const [studentId, questionId] = data.custom_id.split('_');
+        const response = data.response.body.choices[0].message.content;
+        const gradingResult = this.parseResponse(response, studentId, questionId);
+        results.push(gradingResult);
+      } catch (error) {
+        logger.error(`Error parsing batch result line: ${line}, error: ${error}`);
+      }
+    }
+    return results;
+  }
+
+  public addBatchItem(
+    submission: SubmissionInfo,
+    content: string,
+    question: Question
+  ): string {
+    const maxPoint = question.maxPoint || 100;
+    const rubric = question.rubric.replace('{maxPoint}', maxPoint.toString());
+    const questionDescription = question.description || 'No description provided';
+
+    // Construct the prompt for LLM
+    const prompt = this.constructPrompt(content, questionDescription, rubric, maxPoint);
+    const body = {
+      "model": config.llm.model,
+      "messages": [
+        { role: 'system', content: config.llm.basePrompt },
+        { role: 'user', content: prompt }
+      ]
+    }
+
+    const custom_id = `${submission.studentId}_${submission.questionId}`;
+    const item = {
+      "custom_id": custom_id,
+      "method": "POST",
+      "url": "/v1/chat/completions", //  /v1/chat/completions
+      "body": body,
+    }
+    this.batch_items.push(item);
+
+    return custom_id;
+  }
+
+
+  public async clearBatchItems(): Promise<void> {
+    this.batch_items = [];
+  }
+
+  public async batchGradingResult(waitForCompletion: boolean = true): Promise<GradingResult[]> {
+    const assignmentId = config.assignmentId;
+    const folderPath = `./results/batch_${assignmentId}`;
+    try {
+      await fs.promises.mkdir(folderPath, { recursive: true });
+    } catch (error) {
+
+    }
+    logger.info(`Start batch grading, batch size: ${this.batch_items.length}`);
+
+    const content = this.batch_items.map(item => JSON.stringify(item)).join('\n');
+    await fs.promises.writeFile(`${folderPath}/input_file.jsonl`, content, 'utf-8');
+
+    const outputFilePath = await this.llm.batchProcess(folderPath, waitForCompletion);
+    if (!waitForCompletion) {
+      return []; // Return empty array if not waiting for completion
+    }
+    if (!outputFilePath) {
+      throw new Error('Batch processing failed, no output file path returned');
+    }
+
+    return this.parseBatchResponse(outputFilePath);
+  }
+
+
+  /**
+   * Get the batch result from the LLM service
+   * @returns GradingResult[] - An array of grading results parsed from the batch response file
+   */
+  public async getBatchResult(): Promise<GradingResult[]> {
+    const assignmentId = config.assignmentId;
+    const folderPath = `./results/batch_${assignmentId}`;
+    // get batch_id
+    const batchId = (await fs.promises.readFile(`${folderPath}/batch_id.txt`, 'utf-8')).trim();
+
+    const outputFilePath = await this.llm.getBatchResult(folderPath, batchId);
+    if (!outputFilePath) {
+      throw new Error('Batch processing failed, no output file path returned');
+    }
+    return this.parseBatchResponse(outputFilePath);
   }
 }
