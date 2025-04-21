@@ -227,9 +227,12 @@ export class AssignmentProcessor {
         logger.info(`Navigating to student submission: ${studentId}`);
 
         const submissionUrl = `https://canvas.tongji.edu.cn/courses/${this.courseId}/gradebook/speed_grader?assignment_id=${this.assignmentId}&student_id=${studentId}`;
-        await this.page.goto(submissionUrl, { waitUntil: 'load' });
+        await this.page.goto(submissionUrl, { waitUntil: 'domcontentloaded' });
 
         // Wait for the page to fully load
+        if (config.assignmentType === 'single') {
+            return;
+        }
         try {
             await this.page.waitForSelector('#speedgrader_iframe', {
                 state: 'attached',
