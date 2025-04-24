@@ -107,8 +107,10 @@ async function main() {
     for (const batch of batches) {
       logger.info(`Processing batch of ${batch.length} submissions`);
 
-      const results = await batchApi(batch, questions, false, false);
-      // const results = await realApi(batch, questions);
+      // false false => create batch task
+      // false true => get batch result from cloud service
+      // const results = await batchApi(batch, questions, false, true);
+      const results = await realApi(batch, questions);
 
       for (const result of results) {
         if (result && !('error' in result)) {
