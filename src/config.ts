@@ -6,6 +6,7 @@ export const config = {
   courseId: process.env.COURSE_ID || '97701',
   assignmentId: process.env.ASSIGNMENT_ID || '82751',
   assignmentType: process.env.ASSIGNMENT_TYPE || 'single', // single or group
+  binaryScore: process.env.BINARY_SCORE === 'true' || false,  // true for complete/incomplete grading, false for numeric grading
 
   // Browser settings
   headless: process.env.HEADLESS === 'true',

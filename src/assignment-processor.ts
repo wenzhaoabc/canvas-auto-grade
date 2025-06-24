@@ -134,8 +134,13 @@ export class AssignmentProcessor {
                             logger.warn(`No grade found for student ${student.name}, skipping`);
                             continue;
                         }
-                        await this.page.fill('#grading-box-extended', gradeResult.grade.toString());
-                        await this.submitFeedback(gradeResult.grade === 10 ? "已评阅" : gradeResult.comment);
+                        if (config.binaryScore) {
+                            await this.setQuestionGrade(this.page, this.assignmentId, gradeResult.grade);
+                            await this.submitFeedback("已评分");
+                        } else {
+                            await this.page.fill('#grading-box-extended', gradeResult.grade.toString());
+                            await this.submitFeedback(gradeResult.grade === 10 ? "" : gradeResult.comment.replace(/([，,。.；;！!、：:]\s*)?扣\s*[1-9]\s*分/g, ''));
+                        }
 
                         logger.info(`Feedback submitted for student ${student.name}`);
                         continue;
@@ -586,9 +591,35 @@ export class AssignmentProcessor {
     /**
      * Sets a grade for a specific question
      */
-    private async setQuestionGrade(frame: Frame, questionId: string, grade: number): Promise<void> {
+    /**
+     * Sets a grade for a specific question
+     */
+    private async setQuestionGrade(frame: Frame | Page, questionId: string, grade: number): Promise<void> {
         logger.info(`Setting grade ${grade} for question ${questionId}`);
-        await frame.fill(`#question_score_${questionId}_visible`, grade.toString());
+
+        // First try to find the standard score input field
+        const standardScoreField = await frame.$(`#question_score_${questionId}_visible`);
+
+        if (standardScoreField) {
+            // If the standard score field exists, use it
+            await frame.fill(`#question_score_${questionId}_visible`, grade.toString(), { timeout: config.timeouts.element });
+        } else {
+            // Check if we have a dropdown select instead
+            const selectField = await frame.$(`#grading-box-extended`);
+
+            if (selectField) {
+                // If the grade is not 0, select "complete"
+                if (grade > 0) {
+                    await frame.selectOption('#grading-box-extended', 'complete');
+                } else {
+                    // For 0 grade, select an appropriate option like "incomplete" or the first option
+                    await frame.selectOption('#grading-box-extended', 'incomplete');
+                }
+                logger.info(`Used dropdown selection for grading: ${grade > 0 ? 'complete' : 'incomplete'}`);
+            } else {
+                logger.warn(`Could not find grading input for question ${questionId}`);
+            }
+        }
     }
 
     /**
