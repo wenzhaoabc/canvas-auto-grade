@@ -32,7 +32,7 @@ async function batchApi(
       logger.error(`Question ${submission.questionId} not found for submission ${submission.studentId}`);
       continue;
     }
-    const content = await extractor.extractContent(submission.filePath);
+    const content = await extractor.extractContentFromFiles(submission.files);
     grader.addBatchItem(submission, content, question);
   }
   const result = await grader.batchGradingResult(waitForCompletion);
@@ -40,7 +40,7 @@ async function batchApi(
   return result;
 }
 
-async function realApi(
+async function realTimeApi(
   submissions: SubmissionInfo[],
   questions: Map<string, Question>
 ): Promise<GradingResult[]> {
@@ -52,7 +52,7 @@ async function realApi(
       logger.error(`Question ${submission.questionId} not found for submission ${submission.studentId}`);
       return null; // Skip this submission
     }
-    const content = await extractor.extractContent(submission.filePath);
+    const content = await extractor.extractContentFromFiles(submission.files);
     return grader.gradeSubmission(submission, content, question);
   });
 
@@ -110,7 +110,7 @@ async function main() {
       // false false => create batch task
       // false true => get batch result from cloud service
       // const results = await batchApi(batch, questions, false, true);
-      const results = await realApi(batch, questions);
+      const results = await realTimeApi(batch, questions);
 
       for (const result of results) {
         if (result && !('error' in result)) {

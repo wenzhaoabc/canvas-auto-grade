@@ -29,10 +29,16 @@ src
 test
     test.ts # 测试文件，测试各个模块的功能，是否正常工作
     test.sh # 测试脚本，测试各个模块的功能，是否正常工作
+```
 
-
-## batch inference
+## Batch Inference
 
 folder: `results/batch_<assignmentID>`
 file_name: `input_file.jsonl`,`input_file_id.txt`, `batch_id.txt`, `output_file.jsonl`, `error_file.jsonl`
 
+## Usage
+
+1. 从canvas构建question文件，在目录`./questions`下，文件名为作业ID，
+2. 从canvas下载作业的所有打包文件，解压并合入通过邮件提交的文件
+3. 修改`.env`文件中的`ASSIGNMENT_ID`和`DOWNLOAD_PATH`
+4. 运行`npm run start`，会自动批改所有问题并保存为JSON文件

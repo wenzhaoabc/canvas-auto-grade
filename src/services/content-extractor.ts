@@ -111,4 +111,23 @@ export class ContentExtractionService {
             return `Error extracting content: ${error instanceof Error ? error.message : 'Unknown error'}`;
         }
     }
+
+    async extractContentFromFiles(filePaths: string[]): Promise<string> {
+        if (filePaths.length === 1) {
+            return this.extractContent(filePaths[0]);
+        }
+        let result: string = ""
+        for (const filePath of filePaths) {
+            try {
+                const content = await this.extractContent(filePath);
+                const fileName = path.basename(filePath).substring(23); // TODO: KNN file name
+                const fileContent = `# ------File Name: ${fileName}-------\n${content}\n\n`;
+                result += (fileContent);
+            } catch (error) {
+                logger.error(`Failed to extract content from ${filePath}: ${error}`);
+                result += (`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+        }
+        return result;
+    }
 }

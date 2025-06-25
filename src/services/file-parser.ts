@@ -16,7 +16,7 @@ export function parseFileName(filePath: string, assignmentType: AssignmentType):
         if (assignmentType === AssignmentType.GROUP) {
             regex = /^(\d{7})(\d{6})_question_(\d{6})_(\d{7})_(.+)$/;
         } else if (assignmentType === AssignmentType.SINGLE) {
-            regex = /^(\d{7})_(\d{6})_(\d{7})_(.+)$/;
+            regex = /^(\d{7})_(?:LATE_)?(\d{6})_(\d{7})_(.+)$/; // LATE_ is optional
         } else {
             throw new Error(`Unsupported assignment type: ${assignmentType}`);
         }
@@ -36,8 +36,7 @@ export function parseFileName(filePath: string, assignmentType: AssignmentType):
                 studentId,
                 questionId,
                 submissionId,
-                fileName: originalFileName,
-                filePath
+                files: [filePath],
             };
         }
         else if (assignmentType === AssignmentType.SINGLE) {
@@ -49,8 +48,7 @@ export function parseFileName(filePath: string, assignmentType: AssignmentType):
                 studentId,
                 questionId: config.assignmentId, // Use assignmentId as questionId for single submission
                 submissionId,
-                fileName: originalFileName,
-                filePath
+                files: [filePath],
             };
         } else {
             throw new Error(`Unsupported assignment type: ${assignmentType}`);
@@ -71,8 +69,8 @@ export async function getSubmissionFiles(directory: string, assignmentType: Assi
             return [];
         }
 
+        const stuIdSubFile: Map<string, SubmissionInfo> = new Map();
         const files = fs.readdirSync(directory);
-        const submissions: SubmissionInfo[] = [];
 
         for (const file of files) {
             const filePath = path.join(directory, file);
@@ -80,11 +78,25 @@ export async function getSubmissionFiles(directory: string, assignmentType: Assi
 
             if (stats.isFile()) {
                 const info = parseFileName(filePath, assignmentType);
-                if (info) {
-                    submissions.push(info);
+                if (!info) {
+                    logger.warn(`Skipping invalid file: ${file}`);
+                    continue;
+                }
+                // Check if the student ID already exists in the map
+                if (stuIdSubFile.has(info.studentId)) {
+                    // If it exists, append the new submission content
+                    const files = stuIdSubFile.get(info.studentId)?.files || [];
+                    files.push(info.files[0]); // Add the new file path
+                    info.files = files; // Update the info with all files
+                    stuIdSubFile.set(info.studentId, info);
+                } else {
+                    // If not, create a new entry
+                    stuIdSubFile.set(info.studentId, info);
                 }
             }
         }
+        // Convert the map values to an array
+        const submissions = Array.from(stuIdSubFile.values());
 
         logger.info(`Found ${submissions.length} submission files in ${directory}`);
         return submissions;

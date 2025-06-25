@@ -16,8 +16,7 @@ export interface SubmissionInfo {
   studentId: string;
   questionId: string;
   submissionId: string;
-  fileName: string;
-  filePath: string;
+  files: string[]; // List of files path
 }
 
 /**
