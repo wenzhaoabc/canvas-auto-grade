@@ -139,7 +139,7 @@ export class AssignmentProcessor {
                             await this.submitFeedback("已评分");
                         } else {
                             await this.page.fill('#grading-box-extended', gradeResult.grade.toString());
-                            await this.submitFeedback(gradeResult.grade === 10 ? "" : gradeResult.comment.replace(/([，,。.；;！!、：:]\s*)?扣\s*[1-9]\s*分/g, ''));
+                            await this.submitFeedback(gradeResult.grade === 10 ? "已评分" : gradeResult.comment.replace(/([，,。.；;！!、：:]\s*)?扣\s*[1-9]\s*分/g, ''));
                         }
 
                         logger.info(`Feedback submitted for student ${student.name}`);

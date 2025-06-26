@@ -1,0 +1,67 @@
+#Question
+
+1. 超参数k的选择 (4分)
+    (1) 自定义一个规整的数据集，训练一kNN分类器，并评估分类器的准确度。尝试不同的k，采用cross_val_score选出准确度最大的模型。 (3分)
+    (2) 用你的最优模型，预测一个新数据（自己选一个），属于你的数据中的哪个类别？ (1分)
+
+    提交：Knn_学号.py
+
+2. knn预测收入阶层 (6分)
+    使用美国“人口普查收入”数据集（Adult Income Dataset），通过KNN及加权KNN算法对个人收入阶层进行分类预测。数据集包含多种特征（如年龄、教育水平、职业等），目标是预测个人年收入是否超过50K美元。
+
+    数据集说明：
+    数据集文件名： adult.data
+    特征列依次为：'age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 'occupation', 'relationship', 'race', 'sex', 'capital-gain', 'capital-loss', 'hours-per-week', 'native-country'
+    目标列：income，表示收入阶层。
+    数据集数据示例:
+    ```csv
+    age,workclass,fnlwgt,education,educational-num,marital-status,occupation,relationship,race,gender,capital-gain,capital-loss,hours-per-week,native-country,income
+    25,Private,226802,11th,7,Never-married,Machine-op-inspct,Own-child,Black,Male,0,0,40,United-States,<=50K
+    38,Private,89814,HS-grad,9,Married-civ-spouse,Farming-fishing,Husband,White,Male,0,0,50,United-States,<=50K
+    28,Local-gov,336951,Assoc-acdm,12,Married-civ-spouse,Protective-serv,Husband,White,Male,0,0,40,United-States,>50K
+    44,Private,160323,Some-college,10,Married-civ-spouse,Machine-op-inspct,Husband,Black,Male,7688,0,40,United-States,>50K
+    ```
+
+    作业要求：
+    - 数据加载与预处理 (2分)：
+        - 使用pandas 加载data 数据集。 (0.5分)
+        - 将目标变量income 转换为二分类：<=50K 为 0，>50K 为 1。 (0.5分)
+        - 对分类特征进行独热编码（One-Hot Encoding）。 (0.5分)
+        - 分离特征值和目标值，并划分训练集和测试集。   (0.5分)
+    - 模型构建与比较 (4分)：
+        构建以下两种KNN模型：
+        - 普通KNN（KNeighborsClassifier）。K取3   (1分)
+        - 加权KNN（KNeighborsClassifier，基于距离加权）。K取3  (1分)
+        - 使用交叉验证（10折）评估模型性能，输出交叉验证的平均准确率。  (1分)
+        - 在测试集上评估模型准确率，比较两种模型的性能。    (1分)
+
+    提交：Knn_预测收入阶层_学号.py
+
+
+
+#Rubric
+
+该问题主要考查学生使用 Python 进行KNN操作的能力。满分是 {maxPoint} 分。学生可以使用任意库来完成任务。大多数同学会使用 Scikit-learn 库来完成任务。
+- 如果逻辑正确且代码执行正常，应给予满分。执行效率和编码风格及实现方式无需考虑。
+- 只要代码正确完成了任务，就应获得满分。
+- 评分应宽松——无需考虑注释、参数说明或类似的文档，或者是否输出查看结果及其输出格式，仅在执行错误时扣除分数。
+- 可扣分也可不扣分的项目一律不扣分。
+- 代码中体现了Scikit-learn库的正确用法，且代码执行不报错即可获得满分
+
+- 该作业共有两个问题，每个问题的分值及每个步骤的分值已列在题干小括号中，如`(1分)`，该项没有完成，即扣除该项的分数
+- 每个问题提交一个py文件，注意区分两个py文件，若同学提交的作业写在同一个文件中，无需扣分
+- 代码有语法错误，无法执行或执行不正确的扣2分。
+
+- 如果能体现出学生掌握了Scikit-learn的基本操作，即可获得满分，不要在意细节
+
+总分 {maxPoint} 减去要扣除的分数即为学生得分，注意正确计算得分。
+您的评语只需指出每一项扣分项，力求用最简练的语言，不要用连词和过多语气词，用最精炼的文字指出错误所在及错误原因，例如：
+1. xxx 实现错误导致结果错误，应为...，扣 1 分
+2. 未用最优模型预测新数据，扣 1 分
+3. xxx 语法错误，应为...，代码无法运行，扣 2 分
+4. 未在测试数据集上比较两种模型的性能，扣 1 分
+5. xxxx
+
+#MaxPoint
+
+10
