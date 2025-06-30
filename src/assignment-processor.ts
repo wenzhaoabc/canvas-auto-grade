@@ -136,7 +136,7 @@ export class AssignmentProcessor {
                         }
                         if (config.binaryScore) {
                             await this.setQuestionGrade(this.page, this.assignmentId, gradeResult.grade);
-                            await this.submitFeedback("已评分");
+                            await this.submitFeedback(gradeResult.grade === 10 ? "已完成" : gradeResult.comment.replace(/([，,。.；;！!、：:]\s*)?扣\s*[1-9]\s*分/g, ''));
                         } else {
                             await this.page.fill('#grading-box-extended', gradeResult.grade.toString());
                             await this.submitFeedback(gradeResult.grade === 10 ? "已评分" : gradeResult.comment.replace(/([，,。.；;！!、：:]\s*)?扣\s*[1-9]\s*分/g, ''));
