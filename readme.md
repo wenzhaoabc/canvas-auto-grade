@@ -9,7 +9,7 @@
 通过canvas的speed_grader下载某个作业的所有打包文件，各个文件的命名规则为`<学号:7位><学生ID:6位>_question_<问题编号:6位>_<提交ID:7位>_文件名`。读取文件交由LLM评分，保存为JSON文件，再操作playwright自动上传到canvas的speed_grader中
 
 
-重整后文件目录
+文件目录
 
 ```
 src
@@ -28,13 +28,7 @@ src
     main.ts # 主函数，调用process.ts中的函数，自动化填写评分到canvas的speed_grader
 test
     test.ts # 测试文件，测试各个模块的功能，是否正常工作
-    test.sh # 测试脚本，测试各个模块的功能，是否正常工作
 ```
-
-## Batch Inference
-
-folder: `results/batch_<assignmentID>`
-file_name: `input_file.jsonl`,`input_file_id.txt`, `batch_id.txt`, `output_file.jsonl`, `error_file.jsonl`
 
 ## Usage
 
@@ -42,3 +36,9 @@ file_name: `input_file.jsonl`,`input_file_id.txt`, `batch_id.txt`, `output_file.
 2. 从canvas下载作业的所有打包文件，解压并合入通过邮件提交的文件
 3. 修改`.env`文件中的`ASSIGNMENT_ID`和`DOWNLOAD_PATH`
 4. 运行`npm run start`，会自动批改所有问题并保存为JSON文件
+
+## Batch Inference
+
+folder: `results/batch_<assignmentID>`
+file_name: `input_file.jsonl`,`input_file_id.txt`, `batch_id.txt`, `output_file.jsonl`, `error_file.jsonl`
+
