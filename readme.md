@@ -5,7 +5,7 @@
 ## Quick Start
 
 两阶段工作流：
-- 基于LLM作业批改：从Canvas下载作业提交文件，使用LLM模型批改作业，生成评分JSON文件，详情见`v2`分支
+- 基于LLM作业批改：从Canvas下载作业提交文件，使用LLM模型批改作业，生成评分JSON文件，详情见[`grade`](https://github.com/wenzhaoabc/canvas-auto-grade/tree/grade)分支
 - 批改结果上传：借助`playwright`将评分JSON文件中的评分和评语填写至Canvas，详情见`main`分支
 
 ## Usage
@@ -26,6 +26,8 @@
   ...
 ]
 ```
+
+使用LLM逐个批阅作业，生成评语和评分，支持openai `/completions`, `/batch` API，详情见[`grade`](https://github.com/wenzhaoabc/canvas-auto-grade/tree/grade)分支。
 
 ### 批改结果上传
 
